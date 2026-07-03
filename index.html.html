@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>実測野帳 — 内見メジャーツール</title>
+<style>
+:root{
+  --paper:#FBFAF5;
+  --grid:rgba(83,133,113,.16);
+  --ink:#23281F;
+  --ink-soft:#5A5F53;
+  --green:#17453B;
+  --green-deep:#0E332B;
+  --green-line:#2E6B5E;
+  --cream:#EFEAD8;
+  --shu:#C6472B;          /* 実測値=朱書き */
+  --shu-soft:rgba(198,71,43,.12);
+  --c-door:#A2703F;
+  --c-slide:#B08968;
+  --c-win:#3E7CB1;
+  --c-fullwin:#2B6C8F;
+  --c-outlet:#D97D2E;
+  --c-lan:#4A7FB5;
+  --c-tv:#7A5CA0;
+  --c-ac:#3A8F6E;
+  --c-switch:#8A8F85;
+  --c-pan:#5B8DB8;
+  --c-step:#C09A3E;
+  --c-light:#D9AE3B;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --sheet-h:46vh;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:var(--sans);color:var(--ink);background:var(--paper)}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:16px}
+
+/* ---------- top bar ---------- */
+#topbar{
+  position:fixed;top:0;left:0;right:0;height:52px;z-index:40;
+  background:var(--green);color:var(--cream);
+  display:flex;align-items:center;gap:8px;padding:0 10px;
+  border-bottom:3px solid var(--green-deep);
+}
+#topbar .brand{font-size:12px;letter-spacing:.14em;font-weight:700;white-space:nowrap}
+#topbar .brand small{display:block;font-size:9px;font-weight:400;letter-spacing:.28em;opacity:.65}
+#projName{
+  flex:1;min-width:0;background:transparent;border:none;color:var(--cream);
+  border-bottom:1px dashed rgba(239,234,216,.4);padding:2px 4px;font-size:14px;
+}
+#projName:focus{outline:none;border-bottom-color:var(--cream)}
+.tb-btn{
+  height:34px;min-width:34px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:600;
+  color:var(--cream);background:rgba(255,255,255,.08);border:1px solid rgba(239,234,216,.25);
+}
+.tb-btn.active{background:var(--cream);color:var(--green)}
+.tb-btn:disabled{opacity:.35}
+
+/* ---------- stage ---------- */
+#stage{position:fixed;inset:52px 0 60px 0;background:var(--paper)}
+#cv2d,#cv3d{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#cv3d{display:none}
+body.mode3d #cv2d{display:none}
+body.mode3d #cv3d{display:block}
+
+/* readout chip */
+#readout{
+  position:absolute;top:8px;left:8px;z-index:10;pointer-events:none;
+  font-family:var(--mono);font-size:11px;line-height:1.5;color:var(--ink-soft);
+  background:rgba(251,250,245,.88);border:1px solid var(--grid);border-radius:6px;padding:5px 8px;
+}
+#readout .shu{color:var(--shu);font-weight:700}
+#hint{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:10;max-width:86%;
+  background:var(--ink);color:var(--paper);font-size:12px;padding:7px 12px;border-radius:20px;
+  opacity:0;transition:opacity .2s;pointer-events:none;text-align:center;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+#hint.show{opacity:.92}
+#wallDone{
+  position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;display:none;
+  background:var(--shu);color:#fff;font-weight:700;font-size:14px;padding:10px 22px;border-radius:24px;
+  box-shadow:0 3px 10px rgba(0,0,0,.25);
+}
+#legend3d{
+  position:absolute;bottom:10px;left:8px;z-index:10;display:none;pointer-events:none;
+  background:rgba(251,250,245,.9);border:1px solid var(--grid);border-radius:6px;padding:6px 9px;
+  font-size:10px;line-height:1.7;color:var(--ink-soft);
+}
+body.mode3d #legend3d{display:block}
+#legend3d i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+/* ---------- empty state ---------- */
+#empty{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:5;
+  background:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;background-color:var(--paper);
+}
+#empty .card{
+  background:var(--paper);border:2px solid var(--green);border-radius:10px;
+  padding:26px 24px;max-width:340px;margin:16px;box-shadow:6px 6px 0 rgba(23,69,59,.12);
+}
+#empty h1{font-size:19px;color:var(--green);letter-spacing:.06em;margin-bottom:4px}
+#empty .en{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--ink-soft);margin-bottom:14px}
+#empty ol{padding-left:20px;font-size:13px;line-height:1.9;color:var(--ink-soft);margin-bottom:18px}
+#empty ol b{color:var(--ink)}
+.btn-primary{
+  display:block;width:100%;background:var(--green);color:var(--cream);font-size:15px;font-weight:700;
+  padding:13px;border-radius:8px;margin-bottom:8px;
+}
+.btn-ghost{
+  display:block;width:100%;background:none;border:1px solid var(--green-line);color:var(--green);
+  font-size:13px;padding:10px;border-radius:8px;
+}
+
+/* ---------- toolbar ---------- */
+#toolbar{
+  position:fixed;bottom:0;left:0;right:0;height:60px;z-index:40;
+  background:var(--green);border-top:3px solid var(--green-deep);
+  display:flex;align-items:stretch;overflow-x:auto;
+}
+#toolbar::-webkit-scrollbar{display:none}
+.tool{
+  flex:1;min-width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  color:rgba(239,234,216,.75);font-size:10px;position:relative;
+}
+.tool svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tool.active{color:var(--cream);background:rgba(255,255,255,.1)}
+.tool.active::after{content:"";position:absolute;top:0;left:12%;right:12%;height:3px;background:var(--shu)}
+
+/* ---------- bottom sheet ---------- */
+#sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;transform:translateY(105%);
+  transition:transform .22s ease;max-height:70vh;overflow-y:auto;
+  background:var(--paper);border-top:3px solid var(--green);border-radius:14px 14px 0 0;
+  box-shadow:0 -6px 24px rgba(0,0,0,.18);padding:14px 16px calc(18px + env(safe-area-inset-bottom));
+}
+#sheet.open{transform:translateY(0)}
+#sheet .sh-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+#sheet .sh-kind{width:12px;height:12px;border-radius:3px;flex:none}
+#sheet .sh-title{font-weight:700;font-size:15px;flex:1}
+#sheet .sh-close{font-size:22px;color:var(--ink-soft);padding:2px 8px}
+.f-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f-row{display:flex;flex-direction:column;gap:3px}
+.f-row.full{grid-column:1/-1}
+.f-row label{font-size:11px;color:var(--ink-soft);letter-spacing:.05em}
+.f-row input,.f-row select,.f-row textarea{
+  border:1px solid #C9CBBE;border-radius:6px;padding:9px 10px;background:#fff;
+  font-family:var(--mono);color:var(--shu);font-weight:700;
+}
+.f-row select{font-family:var(--sans);color:var(--ink);font-weight:400}
+.f-row textarea{font-family:var(--sans);color:var(--ink);font-weight:400;resize:vertical}
+.f-row .unit{font-size:10px;color:var(--ink-soft)}
+.sh-actions{display:flex;gap:10px;margin-top:14px}
+.sh-actions .del{flex:1;border:1px solid var(--shu);color:var(--shu);border-radius:8px;padding:11px;font-weight:600}
+.sh-actions .ok{flex:2;background:var(--green);color:var(--cream);border-radius:8px;padding:11px;font-weight:700}
+
+/* ---------- menu drawer ---------- */
+#menuWrap{position:fixed;inset:0;z-index:60;display:none}
+#menuWrap.open{display:block}
+#menuWrap .scrim{position:absolute;inset:0;background:rgba(14,51,43,.45)}
+#menu{
+  position:absolute;top:0;right:0;bottom:0;width:min(320px,88vw);background:var(--paper);
+  border-left:3px solid var(--green);padding:18px 16px calc(18px + env(safe-area-inset-bottom));overflow-y:auto;
+}
+#menu h2{font-size:12px;letter-spacing:.2em;color:var(--green);margin:18px 0 8px;border-bottom:1px solid var(--grid);padding-bottom:4px}
+#menu h2:first-child{margin-top:0}
+.m-btn{
+  display:block;width:100%;text-align:left;padding:11px 12px;border-radius:8px;font-size:14px;
+  border:1px solid #C9CBBE;background:#fff;margin-bottom:8px;
+}
+.m-btn.danger{color:var(--shu);border-color:var(--shu)}
+.m-field{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+.m-field label{flex:1;color:var(--ink-soft)}
+.m-field input{width:90px;border:1px solid #C9CBBE;border-radius:6px;padding:8px;font-family:var(--mono);color:var(--shu);font-weight:700}
+#projList .m-btn{display:flex;justify-content:space-between;align-items:center}
+#projList .m-btn.cur{border-color:var(--green);background:var(--shu-soft)}
+#projList small{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">実測野帳<small>FIELD BOOK</small></div>
+  <input id="projName" placeholder="物件名を入力" autocomplete="off">
+  <button class="tb-btn" id="btnUndo" disabled>↶</button>
+  <button class="tb-btn" id="btn2d3d">3D</button>
+  <button class="tb-btn" id="btnMenu">≡</button>
+</header>
+
+<div id="stage">
+  <canvas id="cv2d"></canvas>
+  <canvas id="cv3d"></canvas>
+  <div id="readout"></div>
+  <div id="hint"></div>
+  <button id="wallDone">壁の入力を完了</button>
+  <div id="legend3d"></div>
+
+  <div id="empty">
+    <div class="card">
+      <h1>実測野帳</h1>
+      <div class="en">NAIKEN FIELD MEASUREMENT</div>
+      <ol>
+        <li><b>間取り図の画像</b>を読み込む(SUUMO等のスクショでOK)</li>
+        <li><b>基準</b>ツールで既知の1辺をなぞり実寸を入力</li>
+        <li><b>壁</b>をトレース → 開口部・電源・床置きを配置</li>
+        <li>現地で実測値を朱書き入力 → <b>3D</b>で確認</li>
+      </ol>
+      <button class="btn-primary" id="btnLoadImg">間取り図の画像を選ぶ</button>
+      <button class="btn-ghost" id="btnLoadUrl">URLから読み込む(SUUMO対応・実験的)</button>
+      <button class="btn-ghost" id="btnBlank">画像なし(方眼のみ)で始める</button>
+    </div>
+  </div>
+</div>
+
+<nav id="toolbar">
+  <button class="tool active" data-tool="select">
+    <svg viewBox="0 0 24 24"><path d="M5 3l14 8-6.5 1.5L10 19z"/></svg>選択
+  </button>
+  <button class="tool" data-tool="calib">
+    <svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM8 12l2 2M12 8l2 2M16 4l2 2"/></svg>基準
+  </button>
+  <button class="tool" data-tool="wall">
+    <svg viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12M3 21h18M12 3v18"/></svg>壁
+  </button>
+  <button class="tool" data-tool="opening">
+    <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16"/><path d="M5 12h14"/></svg>開口
+  </button>
+  <button class="tool" data-tool="socket">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9.5 9.5v3M14.5 9.5v3"/></svg>電源
+  </button>
+  <button class="tool" data-tool="floor">
+    <svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><circle cx="12" cy="14" r="3.5"/></svg>床置き
+  </button>
+  <button class="tool" data-tool="memo">
+    <svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>メモ
+  </button>
+</nav>
+
+<div id="sheet">
+  <div class="sh-head">
+    <span class="sh-kind" id="shKind"></span>
+    <span class="sh-title" id="shTitle"></span>
+    <button class="sh-close" id="shClose">×</button>
+  </div>
+  <div class="f-grid" id="shBody"></div>
+  <div class="sh-actions">
+    <button class="del" id="shDel">削除</button>
+    <button class="ok" id="shOk">OK</button>
+  </div>
+</div>
+
+<div id="menuWrap">
+  <div class="scrim" id="menuScrim"></div>
+  <div id="menu">
+    <h2>物件(プロジェクト)</h2>
+    <div id="projList"></div>
+    <button class="m-btn" id="btnNewProj">＋ 新しい物件を追加</button>
+
+    <h2>設定</h2>
+    <div class="m-field"><label>天井高(標準)</label><input id="setCeil" type="number" inputmode="numeric"> <span>mm</span></div>
+    <div class="m-field"><label>壁厚(3D表示用)</label><input id="setWallT" type="number" inputmode="numeric"> <span>mm</span></div>
+
+    <h2>画像</h2>
+    <button class="m-btn" id="btnReplaceImg">間取り図画像を差し替え</button>
+    <button class="m-btn" id="btnReplaceUrl">URLから読み込み(実験的)</button>
+    <button class="m-btn" id="btnAutoTrace">画像から壁を自動抽出(β)</button>
+
+    <h2>データ</h2>
+    <button class="m-btn" id="btnExport">JSONを書き出し(バックアップ)</button>
+    <button class="m-btn" id="btnImport">JSONを読み込み</button>
+    <button class="m-btn danger" id="btnDeleteProj">この物件のデータを削除</button>
+  </div>
+</div>
+
+<input type="file" id="fileImg" accept="image/*">
+<input type="file" id="fileJson" accept="application/json,.json">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =============== helpers =============== */
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt=v=>v==null||v===''?'—':Math.round(v).toLocaleString();
+function hint(msg,ms=2600){const h=$('#hint');h.textContent=msg;h.classList.add('show');clearTimeout(h._t);h._t=setTimeout(()=>h.classList.remove('show'),ms);}
+
+/* =============== catalogs =============== */
+const KIND={
+  opening:{
+    'ドア':      {c:'var(--c-door)',   col:'#A2703F', d:{width:780, height:2000,sill:0}},
+    '引戸':      {c:'var(--c-slide)',  col:'#B08968', d:{width:750, height:1800,sill:0}},
+    '折戸':      {c:'var(--c-slide)',  col:'#C08A52', d:{width:1200,height:2000,sill:0}},
+    '腰窓':      {c:'var(--c-win)',    col:'#3E7CB1', d:{width:1650,height:1100,sill:900}},
+    '掃き出し窓':{c:'var(--c-fullwin)',col:'#2B6C8F', d:{width:1650,height:2030,sill:0}},
+    '玄関':      {c:'#6B4F2E',         col:'#6B4F2E', d:{width:800, height:2000,sill:0}},
+  },
+  socket:{
+    'コンセント':{col:'#D97D2E', d:{height:250}},
+    'LAN':       {col:'#4A7FB5', d:{height:250}},
+    'TV端子':    {col:'#7A5CA0', d:{height:250}},
+    'エアコン用':{col:'#3A8F6E', d:{height:1900}},
+    'スイッチ':  {col:'#8A8F85', d:{height:1200}},
+    '給水/排水': {col:'#4C6E8F', d:{height:400}},
+  },
+  floor:{
+    '洗濯機パン':{col:'#5B8DB8', d:{w:640,dep:640,h:120}},
+    '段差':      {col:'#C09A3E', d:{w:900,dep:300,h:180}},
+    '冷蔵庫置場':{col:'#7FA08C', d:{w:700,dep:700,h:0}},
+    '照明ソケット(天井)':{col:'#D9AE3B', d:{w:120,dep:120,h:0}},
+    'その他':    {col:'#8A8F85', d:{w:600,dep:600,h:0}},
+  }
+};
+const SOCKET_ABBR={'コンセント':'C','LAN':'L','TV端子':'T','エアコン用':'A','スイッチ':'S','給水/排水':'W'};
+
+/* =============== state & storage =============== */
+let P=null;            // current project data
+let curId=null;        // current project id
+let dirty=false, saveTimer=null;
+
+function blankProject(name){
+  return {name:name||'新規物件', image:null, imgW:1200, imgH:900,
+    scale:null, ceilingH:2400, wallT:90, walls:[], items:[]};
+}
+/* storage: claude.ai artifact storage -> localStorage -> in-memory の順でフォールバック */
+const _mem={};
+const store=(typeof window.storage==='object'&&window.storage)?window.storage:(function(){
+  try{localStorage.setItem('naiken-t','1');localStorage.removeItem('naiken-t');
+    return{async get(k){const v=localStorage.getItem(k);return v==null?null:{value:v};},
+           async set(k,v){localStorage.setItem(k,v);return{key:k};},
+           async delete(k){localStorage.removeItem(k);}};
+  }catch(e){
+    return{async get(k){return k in _mem?{value:_mem[k]}:null;},
+           async set(k,v){_mem[k]=v;return{key:k};},
+           async delete(k){delete _mem[k];}};
+  }
+})();
+async function sGet(k){try{const r=await store.get(k);return r?JSON.parse(r.value):null;}catch(e){return null;}}
+async function sSet(k,v){try{await store.set(k,JSON.stringify(v));return true;}catch(e){console.error(e);return false;}}
+async function sDel(k){try{await store.delete(k);}catch(e){}}
+
+async function getIndex(){return (await sGet('naiken-index'))||[];}
+async function setIndex(ix){await sSet('naiken-index',ix);}
+
+function scheduleSave(){
+  dirty=true;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    if(!P||!curId)return;
+    const ok=await sSet('naiken-proj-'+curId,P);
+    if(ok){
+      const ix=await getIndex();
+      const e=ix.find(x=>x.id===curId);
+      if(e){e.name=P.name;e.t=Date.now();await setIndex(ix);}
+      dirty=false;
+    }else if(!scheduleSave._warned){
+      scheduleSave._warned=true;
+      hint('自動保存が使えない環境です — メニューからJSON書き出しを推奨',4000);
+    }
+  },800);
+}
+
+/* =============== undo =============== */
+let undoStack=[], dragUndoPushed=false, sheetUndoPushed=false;
+function pushUndo(){
+  if(!P)return;
+  undoStack.push(JSON.stringify({walls:P.walls,items:P.items,scale:P.scale}));
+  if(undoStack.length>40)undoStack.shift();
+  $('#btnUndo').disabled=false;
+}
+function doUndo(){
+  if(!undoStack.length)return;
+  const s=JSON.parse(undoStack.pop());
+  P.walls=s.walls;P.items=s.items;P.scale=s.scale;
+  selected=null;pendingWall=null;$('#wallDone').style.display='none';
+  closeSheet();draw();scheduleSave();
+  if(!undoStack.length)$('#btnUndo').disabled=true;
+  hint('元に戻しました');
+}
+
+async function newProject(name){
+  const id=uid();
+  const ix=await getIndex();
+  ix.unshift({id,name:name||'新規物件',t:Date.now()});
+  await setIndex(ix);
+  await sSet('naiken-current',id);
+  curId=id; P=blankProject(name);
+  scheduleSave();
+  return id;
+}
+async function loadProject(id){
+  const p=await sGet('naiken-proj-'+id);
+  if(!p)return false;
+  curId=id; P=p;
+  await sSet('naiken-current',id);
+  return true;
+}
+
+/* =============== canvas 2D setup =============== */
+const cv=$('#cv2d'), ctx=cv.getContext('2d');
+let view={x:0,y:0,z:1};   // world(img px) -> screen: s = (w - x)*z ... actually s = w*z + pan
+function s2w(sx,sy){return {x:(sx-view.x)/view.z, y:(sy-view.y)/view.z};}
+function w2s(wx,wy){return {x:wx*view.z+view.x, y:wy*view.z+view.y};}
+let DPR=1;
+function resize(){
+  const r=$('#stage').getBoundingClientRect();
+  DPR=window.devicePixelRatio||1;
+  cv.width=r.width*DPR; cv.height=r.height*DPR;
+  cv.style.width=r.width+'px'; cv.style.height=r.height+'px';
+  draw();
+  if(renderer){renderer.setSize(r.width,r.height);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
+}
+window.addEventListener('resize',resize);
+
+function fitView(){
+  const r=cv.getBoundingClientRect();
+  const z=Math.min(r.width/P.imgW, r.height/P.imgH)*0.92;
+  view.z=z;
+  view.x=(r.width-P.imgW*z)/2;
+  view.y=(r.height-P.imgH*z)/2;
+}
+
+let bgImg=null;
+function setImage(dataURL){
+  if(!dataURL){bgImg=null;draw();return;}
+  const im=new Image();
+  im.onload=()=>{bgImg=im;draw();};
+  im.src=dataURL;
+}
+
+/* image file -> downscaled dataURL */
+function downscale(im){
+  const MAX=1600;
+  const sc=Math.min(1,MAX/Math.max(im.width,im.height));
+  const c=document.createElement('canvas');
+  c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  return {url:c.toDataURL('image/jpeg',0.82), w:c.width, h:c.height};
+}
+function loadImageFile(file,cb){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const im=new Image();
+    im.onload=()=>{const d=downscale(im);cb(d.url,d.w,d.h);};
+    im.src=rd.result;
+  };
+  rd.readAsDataURL(file);
+}
+
+/* ---- URL(SUUMO)から読み込み: 公開CORSプロキシ経由・実験的 ---- */
+const PROXIES=[
+  u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+  u=>'https://corsproxy.io/?url='+encodeURIComponent(u),
+];
+async function proxyFetch(u){
+  let lastErr=null;
+  for(const p of PROXIES){
+    try{
+      const r=await fetch(p(u),{signal:AbortSignal.timeout?AbortSignal.timeout(15000):undefined});
+      if(r.ok)return r;
+      lastErr=new Error('HTTP '+r.status);
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('取得失敗');
+}
+function findMadori(html,baseUrl){
+  html=html.replace(/&amp;/g,'&');
+  // 1) alt/キャプションに「間取」を含むimg
+  let m=html.match(/<img[^>]+alt="[^"]*間取[^"]*"[^>]*src="([^"]+)"/)
+       ||html.match(/<img[^>]+src="([^"]+)"[^>]*alt="[^"]*間取[^"]*"/);
+  if(m)return abs(m[1]);
+  // 2) data-src系(遅延読み込み)
+  m=html.match(/<img[^>]+alt="[^"]*間取[^"]*"[^>]*data-src="([^"]+)"/);
+  if(m)return abs(m[1]);
+  // 3) URL自体にmadoriを含む画像
+  m=html.match(/["'](https?:\/\/[^"']+madori[^"']*\.(?:jpe?g|png|gif|webp)[^"']*)["']/i);
+  if(m)return abs(m[1]);
+  // 4) og:image をフォールバック(SUUMO賃貸は間取り図のことが多い)
+  m=html.match(/property="og:image"\s+content="([^"]+)"/)
+   ||html.match(/content="([^"]+)"\s+property="og:image"/);
+  if(m)return abs(m[1]);
+  return null;
+  function abs(u){try{return new URL(u,baseUrl).href;}catch(e){return u;}}
+}
+async function loadFromUrl(url){
+  url=(url||'').trim();
+  if(!/^https?:\/\//.test(url)){hint('URLを入力してください');return;}
+  hint('取得中…(プロキシ経由)',8000);
+  try{
+    let imgUrl=url;
+    const isImage=/\.(jpe?g|png|gif|webp)(\?|#|$)/i.test(url);
+    if(!isImage){
+      const html=await (await proxyFetch(url)).text();
+      imgUrl=findMadori(html,url);
+      if(!imgUrl)throw new Error('間取り図が見つかりません(掲載終了/HTML構造変更の可能性)');
+    }
+    const blob=await (await proxyFetch(imgUrl)).blob();
+    if(!blob.type.startsWith('image')&&blob.size<2000)throw new Error('画像を取得できません');
+    const objUrl=URL.createObjectURL(blob);
+    const im=new Image();
+    im.onload=()=>{
+      URL.revokeObjectURL(objUrl);
+      const d=downscale(im);
+      P.image=d.url;P.imgW=d.w;P.imgH=d.h;setImage(d.url);
+      $('#empty').style.display='none';fitView();draw();scheduleSave();
+      hint('読み込みました。「基準」でスケール設定 → メニューの自動抽出(β)も試せます',4200);
+      setTool('calib');
+    };
+    im.onerror=()=>{URL.revokeObjectURL(objUrl);hint('画像のデコードに失敗しました');};
+    im.src=objUrl;
+  }catch(e){
+    hint('読み込めませんでした: '+(e.message||e)+' — スクショ読み込みをお使いください',5000);
+  }
+}
+
+/* =============== auto trace (画像→壁の自動抽出) =============== */
+function autoTrace(){
+  if(!bgImg){hint('先に間取り図画像を読み込んでください');return;}
+  let replace=true;
+  if(P.walls.length)replace=confirm('既存の壁を置き換えます。OK=置き換え / キャンセル=既存に追加');
+  hint('解析中…');
+  setTimeout(()=>{
+    try{
+      const segs=traceWalls();
+      if(!segs.length){hint('壁を検出できませんでした(斜め壁・手描き・低コントラスト図面は苦手です)',4200);return;}
+      pushUndo();
+      if(replace)P.walls=[];
+      for(const s of segs)P.walls.push({id:uid(),...s});
+      scheduleSave();draw();
+      hint(`${segs.length}本の壁を抽出しました。選択ツールで不要な線を削除・調整してください`,4200);
+      setTool('select');
+    }catch(e){console.error(e);hint('解析に失敗しました: '+e.message,3600);}
+  },30);
+}
+function traceWalls(){
+  const W=P.imgW,H=P.imgH;
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const g=c.getContext('2d');g.drawImage(bgImg,0,0,W,H);
+  const d=g.getImageData(0,0,W,H).data;
+  // 2値化を2系統に分離: 暗色(黒線壁) / 中間グレー(塗り帯壁)。彩度の高い画素=色付き設備は除外
+  const binD=new Uint8Array(W*H), binG=new Uint8Array(W*H);
+  for(let i=0,p=0;i<binD.length;i++,p+=4){
+    const lum=d[p]*0.299+d[p+1]*0.587+d[p+2]*0.114;
+    const sat=Math.max(d[p],d[p+1],d[p+2])-Math.min(d[p],d[p+1],d[p+2]);
+    if(d[p+3]>180&&sat<70){
+      if(lum<115)binD[i]=1;
+      else if(lum<218)binG[i]=1; // 218以上は床テクスチャ等
+    }
+  }
+  const Lmin=Math.max(24,Math.round(Math.max(W,H)*0.035)); // これ未満の連続線は文字・家具として除去
+  const tMax=Math.max(16,Math.round(Math.max(W,H)*0.03));  // これ以上太い塊は黒ベタとして除去
+  const pass=(bin,tMin)=>{
+    const hM=runFilter(bin,W,H,Lmin,true), vM=runFilter(bin,W,H,Lmin,false);
+    return [...extractSegs(hM,W,H,true,Lmin,tMax,tMin),
+            ...extractSegs(vM,W,H,false,Lmin,tMax,tMin)];
+  };
+  let segs=pass(binD,3);                 // 通常の黒ベタ壁
+  if(segs.length<6)segs=pass(binD,1);    // 白抜き二重線スタイルへのフォールバック
+  segs=segs.concat(pass(binG,4));        // グレー塗り帯の壁
+  segs=mergeParallel(segs,13);           // 二重線を中心線に統合
+  return snapCorners(segs);
+}
+/* 平行して近接する同方向セグメントを1本に統合(二重線壁対策) */
+function mergeParallel(segs,gap){
+  const res=[];
+  for(const horiz of [true,false]){
+    const list=segs.filter(s=>horiz?(s.y1===s.y2):(s.x1===s.x2)).map(s=>({...s}));
+    let changed=true;
+    while(changed){
+      changed=false;
+      outer:
+      for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){
+        const A=list[i],B=list[j];
+        const ap=horiz?A.y1:A.x1, bp=horiz?B.y1:B.x1;
+        if(Math.abs(ap-bp)>gap)continue;
+        const a1=horiz?A.x1:A.y1,a2=horiz?A.x2:A.y2;
+        const b1=horiz?B.x1:B.y1,b2=horiz?B.x2:B.y2;
+        const ov=Math.min(a2,b2)-Math.max(a1,b1);
+        if(ov<Math.min(a2-a1,b2-b1)*0.5)continue;
+        const p=Math.round((ap+bp)/2),lo=Math.min(a1,b1),hi=Math.max(a2,b2);
+        list.splice(j,1);list.splice(i,1);
+        list.push(horiz?{x1:lo,y1:p,x2:hi,y2:p,_t:gap}:{x1:p,y1:lo,x2:p,y2:hi,_t:gap});
+        changed=true;break outer;
+      }
+    }
+    res.push(...list);
+  }
+  return res;
+}
+/* 指定方向にLmin以上連続する画素だけ残す */
+function runFilter(bin,W,H,L,horiz){
+  const out=new Uint8Array(W*H);
+  if(horiz){
+    for(let y=0;y<H;y++){
+      let s=-1;const row=y*W;
+      for(let x=0;x<=W;x++){
+        const v=x<W?bin[row+x]:0;
+        if(v&&s<0)s=x;
+        else if(!v&&s>=0){if(x-s>=L)out.fill(1,row+s,row+x);s=-1;}
+      }
+    }
+  }else{
+    for(let x=0;x<W;x++){
+      let s=-1;
+      for(let y=0;y<=H;y++){
+        const v=y<H?bin[y*W+x]:0;
+        if(v&&s<0)s=y;
+        else if(!v&&s>=0){if(y-s>=L)for(let k=s;k<y;k++)out[k*W+x]=1;s=-1;}
+      }
+    }
+  }
+  return out;
+}
+/* 連結成分→bboxの中心線を壁セグメントに */
+function extractSegs(map,W,H,horiz,Lmin,tMax,tMin){
+  const seen=new Uint8Array(W*H), segs=[], stack=[];
+  for(let i=0;i<map.length;i++){
+    if(!map[i]||seen[i])continue;
+    let x0=1e9,y0=1e9,x1=-1,y1=-1,n=0;
+    stack.length=0;stack.push(i);seen[i]=1;
+    while(stack.length){
+      const q=stack.pop(), qx=q%W, qy=(q-qx)/W;
+      n++;
+      if(qx<x0)x0=qx;if(qx>x1)x1=qx;if(qy<y0)y0=qy;if(qy>y1)y1=qy;
+      if(qx>0&&map[q-1]&&!seen[q-1]){seen[q-1]=1;stack.push(q-1);}
+      if(qx<W-1&&map[q+1]&&!seen[q+1]){seen[q+1]=1;stack.push(q+1);}
+      if(qy>0&&map[q-W]&&!seen[q-W]){seen[q-W]=1;stack.push(q-W);}
+      if(qy<H-1&&map[q+W]&&!seen[q+W]){seen[q+W]=1;stack.push(q+W);}
+    }
+    const bw=x1-x0+1, bh=y1-y0+1;
+    if(horiz){
+      if(bw>=Lmin&&bh>=tMin&&bh<=tMax&&bw/bh>=2.5){
+        const cy=Math.round((y0+y1)/2);
+        segs.push({x1:x0,y1:cy,x2:x1,y2:cy,_t:bh});
+      }
+    }else{
+      if(bh>=Lmin&&bw>=tMin&&bw<=tMax&&bh/bw>=2.5){
+        const cx=Math.round((x0+x1)/2);
+        segs.push({x1:cx,y1:y0,x2:cx,y2:y1,_t:bw});
+      }
+    }
+  }
+  return segs;
+}
+/* 端点を近傍の直交壁にスナップして角を閉じる */
+function snapCorners(segs){
+  const hs=segs.filter(s=>s.y1===s.y2), vs=segs.filter(s=>s.x1===s.x2);
+  const tol=s=>Math.max(14,(s._t||6)*2);
+  for(const h of hs){
+    for(const e of ['x1','x2']){
+      let best=null,bd=tol(h);
+      for(const v of vs){
+        const dd=Math.abs(v.x1-h[e]);
+        const ymin=Math.min(v.y1,v.y2)-bd, ymax=Math.max(v.y1,v.y2)+bd;
+        if(dd<bd&&h.y1>=ymin&&h.y1<=ymax){bd=dd;best=v;}
+      }
+      if(best)h[e]=best.x1;
+    }
+  }
+  for(const v of vs){
+    for(const e of ['y1','y2']){
+      let best=null,bd=tol(v);
+      for(const hh of hs){
+        const dd=Math.abs(hh.y1-v[e]);
+        const xmin=Math.min(hh.x1,hh.x2)-bd, xmax=Math.max(hh.x1,hh.x2)+bd;
+        if(dd<bd&&v.x1>=xmin&&v.x1<=xmax){bd=dd;best=hh;}
+      }
+      if(best)v[e]=best.y1;
+    }
+  }
+  segs.forEach(s=>delete s._t);
+  return segs.filter(s=>Math.hypot(s.x2-s.x1,s.y2-s.y1)>8);
+}
+
+/* =============== geometry helpers =============== */
+function wallLen(w){return Math.hypot(w.x2-w.x1,w.y2-w.y1);}
+function wallPt(w,t){return {x:w.x1+(w.x2-w.x1)*t, y:w.y1+(w.y2-w.y1)*t};}
+function projectOnWall(w,p){
+  const dx=w.x2-w.x1, dy=w.y2-w.y1, L2=dx*dx+dy*dy;
+  if(!L2)return {t:0,d:Math.hypot(p.x-w.x1,p.y-w.y1)};
+  let t=((p.x-w.x1)*dx+(p.y-w.y1)*dy)/L2; t=clamp(t,0,1);
+  const q={x:w.x1+dx*t,y:w.y1+dy*t};
+  return {t,d:Math.hypot(p.x-q.x,p.y-q.y)};
+}
+function nearestWall(p,maxD){
+  let best=null,bd=maxD;
+  for(const w of P.walls){const r=projectOnWall(w,p);if(r.d<bd){bd=r.d;best={wall:w,t:r.t};}}
+  return best;
+}
+function snapPoint(p){ // snap to existing wall endpoints
+  const th=12/view.z;
+  for(const w of P.walls){
+    if(Math.hypot(p.x-w.x1,p.y-w.y1)<th)return{x:w.x1,y:w.y1};
+    if(Math.hypot(p.x-w.x2,p.y-w.y2)<th)return{x:w.x2,y:w.y2};
+  }
+  return p;
+}
+function orthoSnap(a,b){ // snap segment to 0/90deg if within ~8deg
+  const dx=b.x-a.x,dy=b.y-a.y;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dy)<Math.abs(dx)*0.14)return{x:b.x,y:a.y};
+  if(Math.abs(dy)>=Math.abs(dx)&&Math.abs(dx)<Math.abs(dy)*0.14)return{x:a.x,y:b.y};
+  return b;
+}
+function mm(px){return P.scale?px*P.scale:null;}
+
+/* =============== 2D drawing =============== */
+let tool='select', pendingWall=null, calibPts=[], selected=null;
+
+function draw(){
+  if(!P)return;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const r=cv.getBoundingClientRect();
+
+  // paper grid (screen-space, subtle)
+  ctx.fillStyle='#FBFAF5';ctx.fillRect(0,0,r.width,r.height);
+  const g=24;
+  ctx.strokeStyle='rgba(83,133,113,.10)';ctx.lineWidth=1;ctx.beginPath();
+  for(let x=(view.x%g+g)%g;x<r.width;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,r.height);}
+  for(let y=(view.y%g+g)%g;y<r.height;y+=g){ctx.moveTo(0,y);ctx.lineTo(r.width,y);}
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(view.x,view.y);ctx.scale(view.z,view.z);
+
+  // floor plan image
+  if(bgImg){ctx.globalAlpha=.85;ctx.drawImage(bgImg,0,0,P.imgW,P.imgH);ctx.globalAlpha=1;}
+  else{ctx.strokeStyle='rgba(83,133,113,.3)';ctx.lineWidth=1/view.z;ctx.strokeRect(0,0,P.imgW,P.imgH);}
+
+  // walls
+  for(const w of P.walls){
+    const sel=selected&&selected.id===w.id;
+    ctx.strokeStyle=sel?'#C6472B':'#23281F';
+    ctx.lineWidth=(sel?7:5)/view.z;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(w.x1,w.y1);ctx.lineTo(w.x2,w.y2);ctx.stroke();
+    // length label
+    if(P.scale&&wallLen(w)*view.z>46){
+      const mid=wallPt(w,.5), L=mm(wallLen(w));
+      drawLabel(mid.x,mid.y,fmt(L),'#5A5F53',false);
+    }
+  }
+  // pending wall
+  if(pendingWall){
+    ctx.strokeStyle='#C6472B';ctx.setLineDash([8/view.z,6/view.z]);ctx.lineWidth=3/view.z;
+    ctx.beginPath();ctx.moveTo(pendingWall.x,pendingWall.y);
+    if(pendingWall.cur)ctx.lineTo(pendingWall.cur.x,pendingWall.cur.y);
+    ctx.stroke();ctx.setLineDash([]);
+    dot(pendingWall.x,pendingWall.y,'#C6472B');
+  }
+  // calibration in progress / stored
+  if(tool==='calib'&&calibPts.length){
+    ctx.strokeStyle='#C6472B';ctx.lineWidth=2.5/view.z;ctx.setLineDash([4/view.z,4/view.z]);
+    if(calibPts.length===2){ctx.beginPath();ctx.moveTo(calibPts[0].x,calibPts[0].y);ctx.lineTo(calibPts[1].x,calibPts[1].y);ctx.stroke();}
+    ctx.setLineDash([]);
+    calibPts.forEach(p=>dot(p.x,p.y,'#C6472B'));
+  }
+
+  // items
+  for(const it of P.items)drawItem(it);
+  ctx.restore();
+
+  // readout
+  const ro=$('#readout');
+  ro.innerHTML=
+    `基準: ${P.scale?('<span class="shu">1px = '+P.scale.toFixed(2)+'mm</span>'):'<span class="shu">未設定</span>'}<br>`+
+    `天井高: <span class="shu">${fmt(P.ceilingH)}</span> mm ／ 壁 ${P.walls.length}・記録 ${P.items.length}`;
+}
+function dot(x,y,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,5/view.z,0,7);ctx.fill();}
+function drawLabel(x,y,text,color,boxed=true){
+  ctx.font=`700 ${11/view.z}px ui-monospace,Menlo,monospace`;
+  const w=ctx.measureText(text).width;
+  if(boxed){ctx.fillStyle='rgba(251,250,245,.92)';ctx.fillRect(x-w/2-3/view.z,y-8/view.z,w+6/view.z,14/view.z);}
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(text,x,y);
+}
+
+function drawItem(it){
+  const sel=selected&&selected.id===it.id;
+  if(it.type==='opening'){
+    const w=P.walls.find(x=>x.id===it.wallId);if(!w)return;
+    const c=wallPt(w,it.t);
+    const L=wallLen(w), halfPx=P.scale?(it.width/2/P.scale):(L*0.06);
+    const ux=(w.x2-w.x1)/L, uy=(w.y2-w.y1)/L;
+    const a={x:c.x-ux*halfPx,y:c.y-uy*halfPx}, b={x:c.x+ux*halfPx,y:c.y+uy*halfPx};
+    ctx.strokeStyle=KIND.opening[it.kind].col;
+    ctx.lineWidth=(sel?11:8)/view.z;ctx.lineCap='butt';
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    const off=16/view.z, nx=-uy, ny=ux;
+    drawLabel(c.x+nx*off,c.y+ny*off,`${it.kind} W${fmt(it.width)} H${fmt(it.height)}${it.sill?` +${fmt(it.sill)}`:''}`,'#C6472B');
+    if(sel)dot(c.x,c.y,'#C6472B');
+  }
+  else if(it.type==='socket'){
+    const w=P.walls.find(x=>x.id===it.wallId);if(!w)return;
+    const c=wallPt(w,it.t), R=(sel?12:9)/view.z;
+    ctx.fillStyle=KIND.socket[it.kind].col;
+    ctx.beginPath();ctx.arc(c.x,c.y,R,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font=`700 ${10/view.z}px ui-monospace,monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(SOCKET_ABBR[it.kind]||'?',c.x,c.y+0.5/view.z);
+    drawLabel(c.x,c.y+R+9/view.z,`h${fmt(it.height)}`,'#C6472B');
+  }
+  else if(it.type==='floor'){
+    const col=KIND.floor[it.kind].col;
+    const pw=P.scale?it.w/P.scale:60, pd=P.scale?it.dep/P.scale:60;
+    ctx.fillStyle=col+'33';ctx.strokeStyle=col;ctx.lineWidth=(sel?3.5:2)/view.z;
+    ctx.fillRect(it.x-pw/2,it.y-pd/2,pw,pd);
+    ctx.strokeRect(it.x-pw/2,it.y-pd/2,pw,pd);
+    drawLabel(it.x,it.y-pd/2-9/view.z,`${it.kind} ${fmt(it.w)}×${fmt(it.dep)}${it.h?` h${fmt(it.h)}`:''}`,'#C6472B');
+  }
+  else if(it.type==='memo'){
+    ctx.fillStyle=sel?'#C6472B':'#17453B';
+    ctx.beginPath();ctx.arc(it.x,it.y,6/view.z,0,7);ctx.fill();
+    ctx.beginPath();ctx.moveTo(it.x,it.y);ctx.lineTo(it.x,it.y-16/view.z);ctx.stroke();
+    drawLabel(it.x,it.y-24/view.z,(it.value?fmt(it.value)+'mm ':'')+(it.text||'メモ'),'#C6472B');
+  }
+}
+
+/* hit test */
+function itemAt(p){
+  const th=16/view.z;
+  for(let i=P.items.length-1;i>=0;i--){
+    const it=P.items[i];
+    if(it.type==='opening'||it.type==='socket'){
+      const w=P.walls.find(x=>x.id===it.wallId);if(!w)continue;
+      const c=wallPt(w,it.t);
+      if(Math.hypot(p.x-c.x,p.y-c.y)<th*1.2)return it;
+    }else{
+      const pw=(it.type==='floor'&&P.scale)?Math.max(it.w/P.scale/2,th):th;
+      const pd=(it.type==='floor'&&P.scale)?Math.max(it.dep/P.scale/2,th):th;
+      if(Math.abs(p.x-it.x)<pw&&Math.abs(p.y-it.y)<pd)return it;
+    }
+  }
+  return null;
+}
+
+/* =============== pointer interaction (2D) =============== */
+const pointers=new Map();
+let pinch=null, dragItem=null, panStart=null, moved=0;
+
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  moved=0;dragUndoPushed=false;
+  if(pointers.size===2){
+    const ps=[...pointers.values()];
+    pinch={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y),
+           cx:(ps[0].x+ps[1].x)/2, cy:(ps[0].y+ps[1].y)/2, z:view.z, vx:view.x, vy:view.y};
+    dragItem=null;panStart=null;
+    return;
+  }
+  const rect=cv.getBoundingClientRect();
+  const p=s2w(e.clientX-rect.left,e.clientY-rect.top);
+  if(tool==='select'){
+    const it=itemAt(p);
+    if(it){dragItem=it;selected=it;draw();return;}
+  }
+  panStart={sx:e.clientX,sy:e.clientY,vx:view.x,vy:view.y};
+  if(tool==='wall'&&pendingWall){pendingWall.cur=snapPoint(orthoSnap(pendingWall,p));draw();}
+});
+
+cv.addEventListener('pointermove',e=>{
+  if(!pointers.has(e.pointerId))return;
+  const prev=pointers.get(e.pointerId);
+  moved+=Math.hypot(e.clientX-prev.x,e.clientY-prev.y);
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch&&pointers.size===2){
+    const ps=[...pointers.values()];
+    const d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
+    const cx=(ps[0].x+ps[1].x)/2, cy=(ps[0].y+ps[1].y)/2;
+    const nz=clamp(pinch.z*d/pinch.d,0.05,20);
+    // zoom around pinch center + follow center movement
+    view.x=cx-(pinch.cx-pinch.vx)*(nz/pinch.z);
+    view.y=cy-(pinch.cy-pinch.vy)*(nz/pinch.z);
+    view.z=nz;
+    draw();return;
+  }
+  const rect=cv.getBoundingClientRect();
+  const p=s2w(e.clientX-rect.left,e.clientY-rect.top);
+  if(dragItem){
+    if(!dragUndoPushed){pushUndo();dragUndoPushed=true;}
+    if(dragItem.type==='opening'||dragItem.type==='socket'){
+      const nw=nearestWall(p,60/view.z);
+      if(nw){dragItem.wallId=nw.wall.id;dragItem.t=nw.t;}
+    }else{dragItem.x=p.x;dragItem.y=p.y;}
+    draw();scheduleSave();return;
+  }
+  if(panStart){
+    view.x=panStart.vx+(e.clientX-panStart.sx);
+    view.y=panStart.vy+(e.clientY-panStart.sy);
+    if(tool==='wall'&&pendingWall)pendingWall.cur=snapPoint(orthoSnap(pendingWall,p));
+    draw();
+  }
+});
+
+cv.addEventListener('pointerup',e=>{
+  pointers.delete(e.pointerId);
+  if(pointers.size<2)pinch=null;
+  const wasDrag=dragItem;dragItem=null;
+  const wasPan=panStart;panStart=null;
+  if(moved>9){if(wasDrag)scheduleSave();return;}  // it was a drag/pan, not a tap
+  // ---- tap ----
+  const rect=cv.getBoundingClientRect();
+  let p=s2w(e.clientX-rect.left,e.clientY-rect.top);
+  handleTap(p);
+});
+cv.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);pinch=null;dragItem=null;panStart=null;});
+cv.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=cv.getBoundingClientRect();
+  const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+  const nz=clamp(view.z*(e.deltaY<0?1.12:0.89),0.05,20);
+  view.x=cx-(cx-view.x)*(nz/view.z);
+  view.y=cy-(cy-view.y)*(nz/view.z);
+  view.z=nz;draw();
+},{passive:false});
+
+function handleTap(p){
+  if(tool==='select'){
+    const it=itemAt(p);
+    if(it){selected=it;openSheet(it);}
+    else{
+      const nw=nearestWall(p,14/view.z);
+      if(nw){selected=nw.wall;openWallSheet(nw.wall);}
+      else{selected=null;closeSheet();}
+    }
+    draw();return;
+  }
+  if(tool==='calib'){
+    calibPts.push(p);
+    if(calibPts.length===1)hint('もう1点、既知の長さのもう一端をタップ');
+    if(calibPts.length===2){draw();openCalibSheet();return;}
+    draw();return;
+  }
+  if(tool==='wall'){
+    p=snapPoint(p);
+    if(!pendingWall){pendingWall={x:p.x,y:p.y};$('#wallDone').style.display='block';hint('次の点をタップ(直角に自動スナップ)');}
+    else{
+      const b=snapPoint(orthoSnap(pendingWall,p));
+      if(Math.hypot(b.x-pendingWall.x,b.y-pendingWall.y)>4/view.z){
+        pushUndo();
+        P.walls.push({id:uid(),x1:pendingWall.x,y1:pendingWall.y,x2:b.x,y2:b.y});
+        pendingWall={x:b.x,y:b.y};scheduleSave();
+      }
+    }
+    draw();return;
+  }
+  if(tool==='opening'||tool==='socket'){
+    const nw=nearestWall(p,50/view.z);
+    if(!nw){hint('壁の近くをタップしてください(先に壁ツールで壁を引く)');return;}
+    let it;
+    if(tool==='opening'){
+      const k='ドア';
+      it={id:uid(),type:'opening',wallId:nw.wall.id,t:nw.t,kind:k,...KIND.opening[k].d};
+    }else{
+      const k='コンセント';
+      it={id:uid(),type:'socket',wallId:nw.wall.id,t:nw.t,kind:k,...KIND.socket[k].d};
+    }
+    pushUndo();P.items.push(it);selected=it;scheduleSave();draw();openSheet(it);return;
+  }
+  if(tool==='floor'){
+    const k='洗濯機パン';
+    const it={id:uid(),type:'floor',x:p.x,y:p.y,kind:k,...KIND.floor[k].d};
+    pushUndo();P.items.push(it);selected=it;scheduleSave();draw();openSheet(it);return;
+  }
+  if(tool==='memo'){
+    const it={id:uid(),type:'memo',x:p.x,y:p.y,text:'',value:null};
+    pushUndo();P.items.push(it);selected=it;scheduleSave();draw();openSheet(it);return;
+  }
+}
+
+/* wall done button */
+$('#wallDone').onclick=()=>{pendingWall=null;$('#wallDone').style.display='none';draw();};
+
+/* =============== bottom sheet =============== */
+const sheet=$('#sheet');
+function field(label,key,val,unit,attrs=''){
+  return `<div class="f-row"><label>${label}${unit?` <span class="unit">(${unit})</span>`:''}</label>
+    <input data-k="${key}" type="number" inputmode="decimal" value="${val==null?'':val}" ${attrs}></div>`;
+}
+function kindSelect(cat,cur){
+  return `<div class="f-row full"><label>種類</label><select data-k="kind">${
+    Object.keys(KIND[cat]).map(k=>`<option ${k===cur?'selected':''}>${k}</option>`).join('')}</select></div>`;
+}
+let sheetItem=null, sheetIsWall=false, calibSheet=false, urlSheet=false;
+
+function openUrlSheet(){
+  sheetItem=null;sheetIsWall=false;calibSheet=false;urlSheet=true;
+  $('#shKind').style.background='#17453B';$('#shTitle').textContent='URLから間取り図を読み込み';
+  $('#shBody').innerHTML=
+    `<div class="f-row full"><label>SUUMO物件ページのURL、または画像の直接URL</label>
+     <input data-k="url" type="url" placeholder="https://suumo.jp/chintai/…"
+       style="font-family:var(--sans);color:var(--ink);font-weight:400"></div>
+    <div class="f-row full"><label style="color:var(--ink-soft)">実験的機能: 公開CORSプロキシを経由します。掲載終了ページや構造変更で失敗することがあります。その場合はスクショ読み込みを。※claude.ai内のプレビューでは外部取得がブロックされるため、保存したファイルをブラウザで開くかWebサーバー上でお使いください</label></div>`;
+  $('#shDel').style.display='none';
+  bindSheet();sheet.classList.add('open');
+}
+
+function openSheet(it){
+  sheetUndoPushed=false;sheetItem=it;sheetIsWall=false;calibSheet=false;urlSheet=false;
+  const body=$('#shBody');
+  let col='#17453B', title='';
+  if(it.type==='opening'){
+    col=KIND.opening[it.kind].col;title='開口部';
+    body.innerHTML=kindSelect('opening',it.kind)+
+      field('幅 W','width',it.width,'mm')+field('高さ H','height',it.height,'mm')+
+      field('床からの高さ(下端)','sill',it.sill,'mm')+
+      `<div class="f-row full"><label>メモ</label><textarea data-k="note" rows="2">${it.note||''}</textarea></div>`;
+  }else if(it.type==='socket'){
+    col=KIND.socket[it.kind].col;title='電源・端子';
+    body.innerHTML=kindSelect('socket',it.kind)+
+      field('床からの高さ','height',it.height,'mm')+
+      `<div class="f-row full"><label>メモ(口数など)</label><textarea data-k="note" rows="2">${it.note||''}</textarea></div>`;
+  }else if(it.type==='floor'){
+    col=KIND.floor[it.kind].col;title='床置き・段差';
+    body.innerHTML=kindSelect('floor',it.kind)+
+      field('幅','w',it.w,'mm')+field('奥行','dep',it.dep,'mm')+
+      field('高さ/段差','h',it.h,'mm')+
+      `<div class="f-row full"><label>メモ</label><textarea data-k="note" rows="2">${it.note||''}</textarea></div>`;
+  }else if(it.type==='memo'){
+    col='#17453B';title='メモ';
+    body.innerHTML=field('実測値(任意)','value',it.value,'mm')+
+      `<div class="f-row full"><label>内容</label><textarea data-k="text" rows="3">${it.text||''}</textarea></div>`;
+  }
+  $('#shKind').style.background=col;$('#shTitle').textContent=title;
+  $('#shDel').style.display='';
+  bindSheet();sheet.classList.add('open');
+}
+function openWallSheet(w){
+  sheetUndoPushed=false;sheetItem=w;sheetIsWall=true;calibSheet=false;urlSheet=false;
+  $('#shKind').style.background='#23281F';$('#shTitle').textContent='壁';
+  const L=mm(wallLen(w));
+  $('#shBody').innerHTML=
+    `<div class="f-row full"><label>図面上の長さ</label>
+     <input type="text" value="${L?fmt(L)+' mm':'基準未設定'}" disabled></div>`+
+    field('実測して補正(この壁の実長)','fix',L?Math.round(L):'','mm');
+  $('#shDel').style.display='';
+  bindSheet();sheet.classList.add('open');
+}
+function openCalibSheet(){
+  sheetItem=null;sheetIsWall=false;calibSheet=true;urlSheet=false;
+  $('#shKind').style.background='#C6472B';$('#shTitle').textContent='基準の長さを入力';
+  $('#shBody').innerHTML=field('この2点間の実際の長さ','len','','mm','autofocus')+
+    `<div class="f-row full"><label style="color:var(--ink-soft)">例: 間取り図に書かれた一辺、既に契約済みの図面寸法、江戸間6帖の短辺=2600mm など</label></div>`;
+  $('#shDel').style.display='none';
+  bindSheet();sheet.classList.add('open');
+}
+function bindSheet(){
+  $$('#shBody [data-k]').forEach(el=>{
+    el.oninput=()=>{
+      if(calibSheet||urlSheet)return;
+      if(!sheetUndoPushed){pushUndo();sheetUndoPushed=true;}
+      const k=el.dataset.k;
+      let v=el.type==='number'?parseFloat(el.value):el.value;
+      if(el.type==='number'&&isNaN(v))v=null;
+      if(k==='kind'&&sheetItem){
+        sheetItem.kind=el.value;
+        // reset to defaults of new kind
+        Object.assign(sheetItem,KIND[sheetItem.type][el.value].d);
+        openSheet(sheetItem);
+      }else if(k==='fix'&&sheetIsWall){
+        if(v>0){P.scale=v/wallLen(sheetItem);hint('基準を補正しました');}
+      }else if(sheetItem){sheetItem[k]=v;}
+      draw();scheduleSave();
+    };
+  });
+}
+$('#shClose').onclick=closeSheet;
+$('#shOk').onclick=()=>{
+  if(urlSheet){
+    const u=$('#shBody [data-k=url]').value;
+    closeSheet();loadFromUrl(u);return;
+  }
+  if(calibSheet){
+    const v=parseFloat($('#shBody [data-k=len]').value);
+    if(v>0&&calibPts.length===2){
+      pushUndo();
+      P.scale=v/Math.hypot(calibPts[0].x-calibPts[1].x,calibPts[0].y-calibPts[1].y);
+      hint(`基準設定: 1px = ${P.scale.toFixed(2)}mm`);
+      calibPts=[];setTool('select');scheduleSave();
+    }else hint('長さをmmで入力してください');
+  }
+  closeSheet();
+};
+$('#shDel').onclick=()=>{
+  pushUndo();
+  if(sheetIsWall){
+    P.walls=P.walls.filter(w=>w.id!==sheetItem.id);
+    P.items=P.items.filter(it=>it.wallId!==sheetItem.id);
+  }else if(sheetItem){
+    P.items=P.items.filter(it=>it.id!==sheetItem.id);
+  }
+  selected=null;scheduleSave();closeSheet();draw();
+};
+function closeSheet(){sheet.classList.remove('open');sheetItem=null;calibSheet=false;urlSheet=false;draw();}
+
+/* =============== tools & topbar =============== */
+function setTool(t){
+  tool=t;pendingWall=null;calibPts=[];$('#wallDone').style.display='none';
+  $$('#toolbar .tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
+  const H={select:'タップで選択・ドラッグで移動/画面移動・ピンチで拡縮',
+    calib:'既知の長さの両端を2回タップ(まず間取り図の寸法記載箇所がおすすめ)',
+    wall:'壁の角を順にタップしてなぞる。終わったら「完了」',
+    opening:'壁の上をタップして窓・ドアを配置',
+    socket:'壁の上をタップしてコンセント等を配置',
+    floor:'床の位置をタップして洗濯機パン・段差などを配置',
+    memo:'タップした位置にメモピンを置く'};
+  hint(H[t]);
+  closeSheet();draw();
+}
+$$('#toolbar .tool').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+$('#btnUndo').onclick=doUndo;
+
+$('#projName').oninput=e=>{P.name=e.target.value;scheduleSave();};
+
+/* 2D/3D toggle */
+$('#btn2d3d').onclick=()=>{
+  const to3d=!document.body.classList.contains('mode3d');
+  document.body.classList.toggle('mode3d',to3d);
+  $('#btn2d3d').textContent=to3d?'2D':'3D';
+  $('#btn2d3d').classList.toggle('active',to3d);
+  if(to3d){
+    if(!P.scale){hint('先に「基準」でスケール設定すると寸法が正確になります',3200);}
+    build3D();
+  }else{draw();}
+};
+
+/* =============== menu =============== */
+$('#btnMenu').onclick=async()=>{await renderProjList();$('#menuWrap').classList.add('open');
+  $('#setCeil').value=P.ceilingH;$('#setWallT').value=P.wallT;};
+$('#menuScrim').onclick=()=>$('#menuWrap').classList.remove('open');
+$('#setCeil').oninput=e=>{const v=parseFloat(e.target.value);if(v>0){P.ceilingH=v;scheduleSave();draw();}};
+$('#setWallT').oninput=e=>{const v=parseFloat(e.target.value);if(v>0){P.wallT=v;scheduleSave();}};
+
+async function renderProjList(){
+  const ix=await getIndex();
+  $('#projList').innerHTML=ix.map(p=>
+    `<button class="m-btn ${p.id===curId?'cur':''}" data-id="${p.id}">
+      <span>${p.name||'(無題)'}</span><small>${new Date(p.t).toLocaleDateString('ja-JP')}</small></button>`).join('')||'<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">まだありません</div>';
+  $$('#projList .m-btn').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.id===curId)return;
+    if(await loadProject(b.dataset.id)){afterLoad();$('#menuWrap').classList.remove('open');}
+  });
+}
+$('#btnNewProj').onclick=async()=>{
+  await newProject('新規物件 '+new Date().toLocaleDateString('ja-JP'));
+  afterLoad();$('#menuWrap').classList.remove('open');
+  $('#empty').style.display='flex';
+};
+$('#btnDeleteProj').onclick=async()=>{
+  if(!confirm('この物件のデータを完全に削除しますか?'))return;
+  await sDel('naiken-proj-'+curId);
+  const ix=(await getIndex()).filter(x=>x.id!==curId);
+  await setIndex(ix);
+  if(ix.length){await loadProject(ix[0].id);}else{await newProject('新規物件');}
+  afterLoad();$('#menuWrap').classList.remove('open');
+};
+$('#btnReplaceImg').onclick=()=>{$('#fileImg').dataset.mode='replace';$('#fileImg').click();$('#menuWrap').classList.remove('open');};
+
+/* export / import */
+$('#btnExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify(P,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(P.name||'naiken')+'.naiken.json';
+  a.click();URL.revokeObjectURL(a.href);
+};
+$('#btnImport').onclick=()=>$('#fileJson').click();
+$('#fileJson').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=async()=>{
+    try{
+      const p=JSON.parse(rd.result);
+      if(!p.walls||!p.items)throw 0;
+      await newProject(p.name||'読込データ');
+      P={...blankProject(),...p};
+      afterLoad();scheduleSave();
+      $('#menuWrap').classList.remove('open');
+      hint('読み込みました');
+    }catch(_){hint('JSONを読み込めませんでした');}
+  };
+  rd.readAsText(f);e.target.value='';
+};
+
+/* image load */
+$('#btnLoadImg').onclick=()=>{$('#fileImg').dataset.mode='new';$('#fileImg').click();};
+$('#btnLoadUrl').onclick=openUrlSheet;
+$('#btnReplaceUrl').onclick=()=>{$('#menuWrap').classList.remove('open');openUrlSheet();};
+$('#btnAutoTrace').onclick=()=>{$('#menuWrap').classList.remove('open');autoTrace();};
+$('#btnBlank').onclick=()=>{
+  P.image=null;P.imgW=1200;P.imgH=900;bgImg=null;
+  $('#empty').style.display='none';fitView();draw();scheduleSave();
+  hint('「基準」で任意の2点をタップ→長さ入力でスケール設定できます',3600);
+};
+$('#fileImg').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  loadImageFile(f,(url,w,h)=>{
+    P.image=url;P.imgW=w;P.imgH=h;setImage(url);
+    $('#empty').style.display='none';fitView();draw();scheduleSave();
+    hint('「基準」でスケール設定 → メニューの自動抽出(β)で壁の下書きも作れます',4200);
+    setTool('calib');
+  });
+  e.target.value='';
+};
+
+function afterLoad(){
+  $('#projName').value=P.name||'';
+  selected=null;pendingWall=null;calibPts=[];
+  setImage(P.image);
+  $('#empty').style.display=(P.image||P.walls.length)?'none':'flex';
+  document.body.classList.remove('mode3d');
+  $('#btn2d3d').textContent='3D';$('#btn2d3d').classList.remove('active');
+  fitView();draw();
+}
+
+/* =============== 3D =============== */
+let renderer=null,scene=null,camera=null,orb=null,rafId=null;
+const M=1000; // mm->m divisor
+function px2m(px){return (P.scale?px*P.scale:px*3)/M;} // scale未設定時は 1px=3mm 仮定
+
+function init3D(){
+  const c=$('#cv3d');
+  renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});
+  renderer.setPixelRatio(window.devicePixelRatio||1);
+  const r=$('#stage').getBoundingClientRect();
+  renderer.setSize(r.width,r.height);
+  camera=new THREE.PerspectiveCamera(52,r.width/r.height,0.05,200);
+  orb={theta:-Math.PI/4,phi:1.05,radius:8,target:new THREE.Vector3(),ptrs:new Map(),pinchD:0};
+  bindOrbit(c);
+  animate();
+}
+function bindOrbit(c){
+  c.addEventListener('pointerdown',e=>{c.setPointerCapture(e.pointerId);orb.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(orb.ptrs.size===2){const p=[...orb.ptrs.values()];orb.pinchD=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);}});
+  c.addEventListener('pointermove',e=>{
+    if(!orb.ptrs.has(e.pointerId))return;
+    const prev=orb.ptrs.get(e.pointerId);
+    const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
+    orb.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(orb.ptrs.size===1){
+      orb.theta-=dx*0.008;
+      orb.phi=clamp(orb.phi-dy*0.006,0.15,1.52);
+    }else if(orb.ptrs.size===2){
+      const p=[...orb.ptrs.values()];
+      const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+      if(orb.pinchD)orb.radius=clamp(orb.radius*orb.pinchD/d,1,60);
+      orb.pinchD=d;
+      // two finger pan
+      const right=new THREE.Vector3(Math.cos(orb.theta),0,-Math.sin(orb.theta));
+      const fwd=new THREE.Vector3(-Math.sin(orb.theta),0,-Math.cos(orb.theta));
+      orb.target.addScaledVector(right,-dx*0.004*orb.radius*0.15);
+      orb.target.addScaledVector(fwd,dy*0.004*orb.radius*0.15);
+    }
+  });
+  const up=e=>{orb.ptrs.delete(e.pointerId);orb.pinchD=0;};
+  c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
+  c.addEventListener('wheel',e=>{e.preventDefault();orb.radius=clamp(orb.radius*(e.deltaY>0?1.1:0.91),1,60);},{passive:false});
+}
+function animate(){
+  rafId=requestAnimationFrame(animate);
+  if(!document.body.classList.contains('mode3d')||!scene)return;
+  const sp=Math.sin(orb.phi), t=orb.target;
+  camera.position.set(
+    t.x+orb.radius*sp*Math.sin(orb.theta),
+    t.y+orb.radius*Math.cos(orb.phi),
+    t.z+orb.radius*sp*Math.cos(orb.theta));
+  camera.lookAt(t);
+  renderer.render(scene,camera);
+}
+
+function build3D(){
+  if(!renderer)init3D();
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0xE9E8E2);
+  scene.add(new THREE.AmbientLight(0xffffff,0.75));
+  const dl=new THREE.DirectionalLight(0xffffff,0.55);dl.position.set(4,9,5);scene.add(dl);
+  const dl2=new THREE.DirectionalLight(0xfff4e0,0.25);dl2.position.set(-5,6,-4);scene.add(dl2);
+
+  if(!P.walls.length){ $('#legend3d').innerHTML='壁が未入力です — 2Dで壁をなぞると3D化されます'; return; }
+
+  // bbox & center
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  P.walls.forEach(w=>{minx=Math.min(minx,w.x1,w.x2);maxx=Math.max(maxx,w.x1,w.x2);
+                     miny=Math.min(miny,w.y1,w.y2);maxy=Math.max(maxy,w.y1,w.y2);});
+  const cx=(minx+maxx)/2, cy=(miny+maxy)/2;
+  const X=px=>px2m(px-cx), Z=px=>px2m(px-cy);
+  const H=P.ceilingH/M, T=P.wallT/M;
+
+  // floor
+  const fw=px2m(maxx-minx)+T*4, fd=px2m(maxy-miny)+T*4;
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(fw,0.02,fd),
+    new THREE.MeshLambertMaterial({color:0xF5F1E4}));
+  floor.position.y=-0.01;scene.add(floor);
+  // grid on floor
+  const grid=new THREE.GridHelper(Math.max(fw,fd),Math.round(Math.max(fw,fd)/0.455),0xB9C4B4,0xD5DCCF);
+  grid.position.y=0.002;scene.add(grid);
+
+  const wallMat=new THREE.MeshLambertMaterial({color:0xF9F7EF});
+  const wallEdge=new THREE.LineBasicMaterial({color:0x17453B});
+
+  for(const w of P.walls){
+    const L=px2m(wallLen(w));if(L<0.01)continue;
+    const ang=Math.atan2(Z(w.y2)-Z(w.y1),X(w.x2)-X(w.x1));
+    const mx=(X(w.x1)+X(w.x2))/2, mz=(Z(w.y1)+Z(w.y2))/2;
+    const geo=new THREE.BoxGeometry(L,H,T);
+    const mesh=new THREE.Mesh(geo,wallMat);
+    mesh.position.set(mx,H/2,mz);mesh.rotation.y=-ang;
+    scene.add(mesh);
+    scene.add(edgeBox(geo,mesh.position,mesh.rotation,wallEdge));
+    // openings & sockets on this wall
+    for(const it of P.items){
+      if(it.wallId!==w.id)continue;
+      const pt=wallPt(w,it.t), px=X(pt.x), pz=Z(pt.y);
+      if(it.type==='opening'){
+        const ow=(it.width||600)/M, oh=(it.height||1000)/M, os=(it.sill||0)/M;
+        const og=new THREE.BoxGeometry(ow,oh,T+0.03);
+        const om=new THREE.Mesh(og,new THREE.MeshLambertMaterial({
+          color:parseInt(KIND.opening[it.kind].col.slice(1),16),transparent:true,opacity:0.82}));
+        om.position.set(px,os+oh/2,pz);om.rotation.y=-ang;scene.add(om);
+      }else if(it.type==='socket'){
+        const sh=(it.height||250)/M;
+        const sg=new THREE.BoxGeometry(0.09,0.13,T+0.035);
+        const sm=new THREE.Mesh(sg,new THREE.MeshLambertMaterial({
+          color:parseInt(KIND.socket[it.kind].col.slice(1),16)}));
+        sm.position.set(px,sh,pz);sm.rotation.y=-ang;scene.add(sm);
+      }
+    }
+  }
+  // floor items
+  for(const it of P.items){
+    if(it.type==='floor'){
+      const w=(it.w||500)/M, d=(it.dep||500)/M;
+      const col=parseInt(KIND.floor[it.kind].col.slice(1),16);
+      if(it.kind==='照明ソケット(天井)'){
+        const m=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.04,20),
+          new THREE.MeshLambertMaterial({color:col}));
+        m.position.set(X(it.x),H-0.02,Z(it.y));scene.add(m);
+      }else{
+        const h=Math.max((it.h||0)/M,0.015);
+        const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+          new THREE.MeshLambertMaterial({color:col,transparent:true,opacity:0.9}));
+        m.position.set(X(it.x),h/2,Z(it.y));scene.add(m);
+      }
+    }else if(it.type==='memo'){
+      const m=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.14,12),
+        new THREE.MeshLambertMaterial({color:0xC6472B}));
+      m.position.set(X(it.x),0.07,Z(it.y));scene.add(m);
+    }
+  }
+  // camera fit
+  orb.target.set(0,H/2,0);
+  orb.radius=Math.max(fw,fd)*1.15+2;
+  // legend
+  $('#legend3d').innerHTML=[
+    ['#A2703F','ドア/引戸/折戸'],['#3E7CB1','窓'],['#D97D2E','コンセント'],['#4A7FB5','LAN'],
+    ['#3A8F6E','エアコン用'],['#5B8DB8','洗濯機パン'],['#C09A3E','段差'],['#D9AE3B','照明'],['#C6472B','メモ']
+  ].map(([c,l])=>`<i style="background:${c}"></i>${l}`).join('<br>')+
+  `<br><span style="color:#C6472B;font-weight:700">CH ${fmt(P.ceilingH)}mm</span>`;
+}
+function edgeBox(geo,pos,rot,mat){
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),mat);
+  e.position.copy(pos);e.rotation.copy(rot);return e;
+}
+
+/* =============== boot =============== */
+(async function boot(){
+  let id=null;
+  try{id=await sGet('naiken-current');}catch(e){}
+  if(id&&await loadProject(id)){}
+  else{
+    const ix=await getIndex();
+    if(ix.length&&await loadProject(ix[0].id)){}
+    else await newProject('新規物件');
+  }
+  resize();afterLoad();
+  hint('ようこそ。まず間取り図画像を読み込んでください',2800);
+})();
+</script>
+</body>
+</html>
